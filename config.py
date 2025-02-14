@@ -6,6 +6,7 @@ load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 API_KEY = os.getenv("CRYPTO_BOT_TOKEN")
+
 start_menu = [
     {
         "title" : "⭐ Витрина номеров",
@@ -49,6 +50,10 @@ admin_menulist = [
         "title" : "Установить цену",
         "action" : "setPrice"
     },
+    {
+        "title" : "Доступность витрины",
+        "action" : "set_window_allowed"
+    }
 ]
 profile_button = {
     "title" : "💼 Профиль",

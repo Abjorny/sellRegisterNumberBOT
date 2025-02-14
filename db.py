@@ -86,6 +86,12 @@ class Database:
         await self.cursor.execute(f"UPDATE settings SET {key} = ? WHERE id = 0",(value,))
         await self.connection.commit()
         
-    async def get_settings_price(self):
-        await self.cursor.execute("SELECT price FROM settings where id = 0")
+    async def get_settings(self, key):
+        await self.cursor.execute(f"SELECT {key} FROM settings where id = 0")
         return await self.cursor.fetchone()
+
+    async def add_archive(self, text, userid):
+        await self.cursor.execute("INSERT INTO archive (text, userid) VALUES (?, ?)", (text, userid))
+        order_id = self.cursor.lastrowid  
+        await self.connection.commit()
+        return order_id 

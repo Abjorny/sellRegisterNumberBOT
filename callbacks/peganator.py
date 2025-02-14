@@ -51,15 +51,26 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         peganatorMessage.date = [await user.get_role()]
     
     elif action == "registerProfile":
-        peganatorMessage.last = "menu"
-        peganatorMessage.text = "*Для регистрации укажите ваш email!*"
+        role = await user.get_role()
         peganatorMessage.page = 1
-        await state.set_state(FormRegisterProfile.email)
+        peganatorMessage.last = "menu"
+        if role == "moderation":
+            peganatorMessage.text = "*У вас уже есть активная заявка на регистрацию, пожалуйста дождитесь ее решения.*"
+        elif role in ['verif', 'admin']:
+            peganatorMessage.text = f"*Вы уже прошли регестрацию, ваша текущая роль {role}*"
+        else:
+            peganatorMessage.text = "*Для регистрации укажите ваш email!*"
+            await state.set_state(FormRegisterProfile.email)
     
     elif action == "aprovedRegister":
         peganatorMessage.text = "*Действие выполнено!*"
         peganatorMessage.page = -1
         peganatorMessage.last = "menu"
+        text_bd = f"Пользователю с userid {callback_data.data}, {'подтвердили' if callback_data.last == "accept" else 'отклонили'} заявку"
+        await dataBase.add_archive(
+            text = text_bd,
+            userid = user.id
+        )
         if callback_data.last == "accept":
             await dataBase.set_user_data(
                 userid = callback_data.data,
@@ -72,9 +83,20 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
             )
     
     elif action == "ordersList":
+        role = await user.get_role()
+        available = await dataBase.get_settings('window_allowed')
+        
+        if role in ['user', 'moderation'] and available[0] == 0:
+            await call.answer(
+                text = "Сначала зарегистрируйтесь!",
+                show_alert=True
+            )
+            return
+        
         orders = await dataBase.get_all_orders_active()
-        price = await dataBase.get_settings_price()
+        price = await dataBase.get_settings('price')
         orders_list = []
+        
         for order in orders:
             userData = await dataBase.get_user_userid(order[1])
             if userData[8]:
@@ -91,10 +113,12 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
                                 orders_list.append(order)
                     else:
                         orders_list.append(order)
+                        
         if len(orders_list) == 0:
             peganatorMessage.text = "*Пока предложений нету*"
             peganatorMessage.page = 1
             peganatorMessage.last = "menu"
+        
         else:
             peganatorMessage.text = "*Нажмите на интересующие вас предложение!*"
             peganatorMessage.page = 3
@@ -106,7 +130,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         peganatorMessage.last = "menu"
         peganatorMessage.text = "*Личный кабинет\n"
         userData = await dataBase.get_user_userid(userid = user.id)
-        price = await dataBase.get_settings_price()
+        price = await dataBase.get_settings('price')
         
         if price[0] is not None and price[0] != 0 and price[0] != '':
             peganatorMessage.date = [1]
@@ -188,12 +212,20 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
     elif action == "aprovedNumber":
         orderId = int(callback_data.data)
         status = "active" if callback_data.last == "accept" else   "denied"
+
         await dataBase.set_order_data(
             ids = orderId,
             key = "status",
             value = status
         )
         order = await dataBase.get_order_id(orderId)
+        
+        text_bd = f"У номера {order[2]} обнови статус. Новый статус = {status}"
+        await dataBase.add_archive(
+            text = text_bd,
+            userid = user.id
+        )
+        
         await bot.send_message(
                 chat_id = order[1],
                 text = f"У номера {order[2]} обновился статус!\nНовый статус = {status}"
@@ -215,10 +247,19 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
     elif action == "adminPanel":
         await state.clear()
         users = await dataBase.get_users()
-        price = await dataBase.get_settings_price()
-        peganatorMessage.text = f"*Выберите функцию\n\nВсего пользователей = {len(users)}\nТеукущая стоимость = {price[0]}*"
+        price = await dataBase.get_settings('price')
+        available = await dataBase.get_settings('window_allowed')
+        peganatorMessage.text = f"*Выберите функцию\n\nВсего пользователей = {len(users)}\nТеукущая стоимость = {price[0]}\nДоступность витрины всем = {'да' if bool(available[0]) else 'нет'}*"
         peganatorMessage.page = 10
         peganatorMessage.last = "menu"
+    
+    elif action == "set_window_allowed":
+        available = await dataBase.get_settings('window_allowed')
+        new_available = 0 if available[0] == 1 else 1
+        await dataBase.set_settings_data("window_allowed", new_available)
+        peganatorMessage.page = 1
+        peganatorMessage.text = f"*Вы изменили доступность витрины, новое значение = {'да' if bool(new_available) else 'нет'}*"
+        peganatorMessage.last = 'adminPanel'
     
     elif action == "deleateAdministrator":
         peganatorMessage.text = "*Выберите пользователя, у которого хотите забрать права администратора*" 
@@ -286,7 +327,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         peganatorMessage.last = "profile"
     
     elif action == "createPay":
-        price = await dataBase.get_settings_price()
+        price = await dataBase.get_settings('price')
         if price != 0 and price != None:
             payUrl = await cryptobot.create_payment(
                 crypto = callback_data.data,
@@ -321,6 +362,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
                     key = "payData",
                     value = current_time
                 )
+    
     await peganatorMessage.callEditText()
 
 
