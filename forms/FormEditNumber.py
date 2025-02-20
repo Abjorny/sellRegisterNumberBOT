@@ -30,7 +30,8 @@ async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
         value = "moderation"
     )
     order = await dataBase.get_order_id(data['thisOrderId'])
-    admin_text = f"Новая заявка:\n\nАйди = {order[0]}\nНомер = {order[2]}\nКоменнтарий = {order[3]}\nЦена = {order[4]}\nСтатус = {order[6]}"    
+    
+    admin_text = f"Новая заявка:\n\nАйди = {order[0]}\nИмя = {message.from_user.first_name}\nUserid = {order[1]}\nНомер = {order[2]}\nКоменнтарий = {order[3]}\nЦена = {order[4]}\nСтатус = {order[6]}"    
     await Notifications.send_all_admins(
             text = admin_text,
             page = 9,

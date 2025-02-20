@@ -66,7 +66,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         peganatorMessage.text = "*Действие выполнено!*"
         peganatorMessage.page = -1
         peganatorMessage.last = "menu"
-        text_bd = f"Пользователю с userid {callback_data.data}, {'подтвердили' if callback_data.last == "accept" else 'отклонили'} заявку"
+        text_bd = f"Пользователю с userid {callback_data.data}, {'подтвердили' if callback_data.last == 'accept' else 'отклонили'} заявку"
         await dataBase.add_archive(
             text = text_bd,
             userid = user.id
@@ -228,8 +228,9 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         
         await bot.send_message(
                 chat_id = order[1],
-                text = f"У номера {order[2]} обновился статус!\nНовый статус = {status}"
+                text = f"У номера {order[2]} обновился статус!\nНовый статус = {status}\nНе забывайте обнавлять актуальность номеров в профиле!"
             )
+        
         peganatorMessage.text = "*Действие выполнено!*"
         peganatorMessage.page = -1
     
@@ -298,7 +299,8 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         usersModerations = await dataBase.get_users_moderations()
         userData = await dataBase.get_user_userid(user.id)
         for order in ordersModerations:
-            admin_text = f"Новая заявка:\n\nАйди = {order[0]}\nНомер = {order[2]}\nКоменнтарий = {order[3]}\nЦена = {order[4]}\nСтатус = {order[6]}"    
+            user_delta = await dataBase.get_user_userid(order[1])
+            admin_text = f"Новая заявка:\n\nАйди = {order[0]}\nИмя = {user_delta[2]}\nUserid = {order[1]}\nНомер = {order[2]}\nКоменнтарий = {order[3]}\nЦена = {order[4]}\nСтатус = {order[6]}"    
             await Notifications.send_notifs(
                 text = admin_text,
                 page = 9,
