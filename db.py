@@ -54,8 +54,8 @@ class Database:
         await self.cursor.execute(f"UPDATE orders SET {key} = ? WHERE id = ?",(value,ids))
         await self.connection.commit() 
         
-    async def add_order(self, userid, url, number, comment, price):
-        await self.cursor.execute("INSERT INTO orders (userid, url, number, comment, price) VALUES (?,?,?,?,?)", (userid, url, number, comment, price))
+    async def add_order(self, userid, url, number, comment, price, photo = None):
+        await self.cursor.execute("INSERT INTO orders (userid, url, number, comment, price, photo) VALUES (?,?,?,?,?,?)", (userid, url, number, comment, price, photo))
         order_id = self.cursor.lastrowid  
         await self.connection.commit()
         return order_id 

@@ -210,6 +210,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         await state.set_state(FormEditNumber.value)
     
     elif action == "aprovedNumber":
+        await call.message.delete()
         orderId = int(callback_data.data)
         status = "active" if callback_data.last == "accept" else   "denied"
 
@@ -218,6 +219,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
             key = "status",
             value = status
         )
+        
         order = await dataBase.get_order_id(orderId)
         
         text_bd = f"У номера {order[2]} обнови статус. Новый статус = {status}"
@@ -230,9 +232,41 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
                 chat_id = order[1],
                 text = f"У номера {order[2]} обновился статус!\nНовый статус = {status}\nНе забывайте обнавлять актуальность номеров в профиле!"
             )
+        return 
+
+    elif action == "formAddNumberPhotoSkeep":
+        data = await state.get_data()
+        peganatorMessage.text = "*Успешно!\nВаш товар отправлен на расмотренние администратором.*"
+        peganatorMessage.page = 1
+        peganatorMessage.last = "profile"
         
-        peganatorMessage.text = "*Действие выполнено!*"
-        peganatorMessage.page = -1
+        url = f'https://t.me/{user.username}' if user.username != None and  user.username  != '' \
+            else call.message.from_user.url
+            
+        ids = await dataBase.add_order(
+            userid = user.id,
+            url =  url,
+            number = data['number'],
+            comment = data['coment'],
+            price = data['price'],
+        )
+        
+        order = await dataBase.get_order_id(ids)
+        
+        admin_text = f"Новая заявка:\n\nАйди = {order[0]}\nИмя = {user.first_name}\nUserid = {order[1]}\nНомер = {order[2]}\nКоменнтарий = {order[3]}\nЦена = {order[4]}\nСтатус = {order[6]}"    
+    
+        await Notifications.send_all_admins(
+            text = admin_text,
+            page = 9,
+            data = [ids],
+            last = "menu",
+            message = call.message,
+        )
+        
+
+        
+        await state.clear()
+
     
     elif action == "acceptActual":
         peganatorMessage.text = "*Актуальность ваших номеров подтверждина.*"
@@ -307,7 +341,8 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
                 data = [order[0]],
                 last = "menu",
                 message = call.message,
-                users = [userData]
+                users = [userData],
+                fileid=order[7]
             )
         for userDt in  usersModerations:
             admin_text = f"Заяка!\n\nПервое имя = {userDt[2]}\nВторое имя = {userDt[3]}\nuserid = {userDt[1]}\nEmail = {userDt[7]}\nНомер телефона = {userDt[6]}"
@@ -364,6 +399,29 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
                     key = "payData",
                     value = current_time
                 )
+    
+    elif action == "deleateMessage":
+        await call.message.delete()
+        return
+    
+    elif action == "openOrder":
+        order = await dataBase.get_order_id(callback_data.data)
+        text = f"*Номер: {order[2]}\nКомментарий: {order[3]}\nЦена: {order[4]}*"
+        text = FormatedText.formatMarkdownV2(text)
+        await call.message.bot.send_photo(
+            chat_id = user.id,
+            photo = order[7],
+            caption  = text,
+            reply_markup=fabric.pagination(
+                15,
+                user.id,
+                "ordersList",
+                [order[5]]
+            ),
+                parse_mode='MarkdownV2'
+        )
+
+        return
     
     await peganatorMessage.callEditText()
 

@@ -56,10 +56,19 @@ def pagination(page: int=0,id: int=1,last:str='',elem: list=None):
             
     elif page == 3:
         for order in elem:
-            build.button(
-                text = f"{order[2]} | {order[4]} | {order[3]}",
-                url = order[5]
-            )
+            textButton =  f"{order[2]} | {order[4]} | {order[3]}"
+            if order[7] is None:
+                build.button(
+                    text = textButton,
+                    url = order[5]
+                )
+            else:
+                build.button(
+                    text = textButton,
+                    callback_data=Pagination(action = "openOrder", page=page, last=last, data=f'{order[0]}')
+                )
+                
+                
         build.button(
             text = "⬅️ Назад",
             callback_data=Pagination(action = last, page=page, last=last, data='')
@@ -203,4 +212,26 @@ def pagination(page: int=0,id: int=1,last:str='',elem: list=None):
             callback_data=Pagination(action = last, page=page, last=last, data='')
         )
         build.adjust(1)
+        
+    elif page == 14:
+        build.button(
+            text = "Пропустить",
+            callback_data=Pagination(action = "formAddNumberPhotoSkeep", page=page, last=last, data='')
+        )
+        build.button(
+            text = "⬅️ Назад",
+            callback_data=Pagination(action = last, page=page, last=last, data='')
+        )
+        build.adjust(1)
+    
+    elif page == 15:
+        build.button(
+            text = "Связаться",
+            url = elem[0]
+        )
+        build.button(
+            text = "⬅️ Назад",
+            callback_data=Pagination(action = "deleateMessage", page=page, last=last, data='')
+        )
+        build.adjust(1) 
     return build.as_markup(resize_keyboard=True)
