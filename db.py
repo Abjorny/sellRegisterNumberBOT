@@ -88,7 +88,8 @@ class Database:
         
     async def get_settings(self, key):
         await self.cursor.execute(f"SELECT {key} FROM settings where id = 0")
-        return await self.cursor.fetchone()
+        data = await self.cursor.fetchone()
+        return data[0]
 
     async def add_archive(self, text, userid):
         await self.cursor.execute("INSERT INTO archive (text, userid) VALUES (?, ?)", (text, userid))

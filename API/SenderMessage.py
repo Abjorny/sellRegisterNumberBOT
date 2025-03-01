@@ -7,14 +7,36 @@ dataBase = Database("DB.db")
 class Notifications:
     @staticmethod
     async def send_notifs(
-        text, page, data, last, users, message:types.Message, fileid
+        text, page, data, last, users, message: types.Message, fileid
     ):
         for user in users:
-            try:
-                if fileid is None:
+                if isinstance(fileid, list):  
+                    media = []
+                    for index, photo in enumerate(fileid):
+                        if index == 0:
+                            media.append(types.InputMediaPhoto(media= photo))
+                        else:
+                            media.append(types.InputMediaPhoto(media= photo))
+                    
+                    await message.bot.send_media_group(
+                        chat_id=user[1],
+                        media=media,
+                    ),
                     await message.bot.send_message(
-                        chat_id = user[1],
-                        text  = text,
+                            chat_id=user[1],
+                            text=text,
+                            reply_markup=fabric.pagination(
+                                page,
+                                message.from_user.id,
+                                last,
+                                data
+                            ),
+                        )
+
+                elif fileid is None: 
+                    await message.bot.send_message(
+                        chat_id=user[1],
+                        text=text,
                         reply_markup=fabric.pagination(
                             page,
                             message.from_user.id,
@@ -22,11 +44,11 @@ class Notifications:
                             data
                         ),
                     )
-                else:
+                else:  
                     await message.bot.send_photo(
-                        chat_id = user[1],
-                        photo = fileid,
-                        caption  = text,
+                        chat_id=user[1],
+                        photo=fileid,
+                        caption=text,
                         reply_markup=fabric.pagination(
                             page,
                             message.from_user.id,
@@ -34,8 +56,8 @@ class Notifications:
                             data
                         ),
                     )
-            except Exception as e :
-                print(e)
+
+
     @staticmethod
     async def send_all_admins(
         text, page, data, last, message:types.Message, fileid = None

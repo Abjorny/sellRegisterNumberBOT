@@ -234,4 +234,14 @@ def pagination(page: int=0,id: int=1,last:str='',elem: list=None):
             callback_data=Pagination(action = "deleateMessage", page=page, last=last, data='')
         )
         build.adjust(1) 
+    elif page == 16:
+        build.button(
+            text = "Готово",
+            callback_data=Pagination(action = "formAddNumberPhotoSkeep", page=page, last=last, data='')
+        )
+        build.button(
+            text = "⬅️ Назад",
+            callback_data=Pagination(action = last, page=page, last=last, data='')
+        )
+        build.adjust(1) 
     return build.as_markup(resize_keyboard=True)

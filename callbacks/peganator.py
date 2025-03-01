@@ -25,6 +25,9 @@ dataBase = Database("DB.db")
 class FormSetPrice(StatesGroup):
     price = State()
 
+class FormSetActualTime(StatesGroup):
+    time = State()
+
  
 class Pagination(CallbackData, prefix='pag'):
     action: str
@@ -32,6 +35,11 @@ class Pagination(CallbackData, prefix='pag'):
     last : str
     data : str
 
+def swipeInt(delta):
+    return 0 if delta == 1 else 1
+
+def boolToStr(word):
+    return 'да' if bool(word) else 'нет'
 
 @router.callback_query(Pagination.filter())
 async def pagination_handler(call: CallbackQuery, callback_data: Pagination,state: FSMContext,bot:Bot):
@@ -85,8 +93,11 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
     elif action == "ordersList":
         role = await user.get_role()
         available = await dataBase.get_settings('window_allowed')
+        relevance_allowed = await dataBase.get_settings('relevance_allowed')
+        actual_time = await dataBase.get_settings('actual_time')
+        actual_time = max(1,actual_time) if actual_time else 1
         
-        if role in ['user', 'moderation'] and available[0] == 0:
+        if role in ['user', 'moderation'] and available == 0:
             await call.answer(
                 text = "Сначала зарегистрируйтесь!",
                 show_alert=True
@@ -99,20 +110,23 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         
         for order in orders:
             userData = await dataBase.get_user_userid(order[1])
-            if userData[8]:
-                stored_time = datetime.strptime(userData[8], "%Y-%m-%d %H:%M:%S")
-                now = datetime.now()
-                difference = (now - stored_time).days
-                if difference <=2:
-                    if price[0] != None and price[0] !=0:
-                        if userData[5]:
-                            stored_time = datetime.strptime(userData[5], "%Y-%m-%d %H:%M:%S")
-                            now = datetime.now()
-                            difference = (now - stored_time).days
-                            if difference < 30:
-                                orders_list.append(order)
-                    else:
-                        orders_list.append(order)
+            if bool(relevance_allowed):
+                if userData[8]:
+                    stored_time = datetime.strptime(userData[8], "%Y-%m-%d %H:%M:%S")
+                    now = datetime.now()
+                    difference = (now - stored_time).days
+                    if difference <= actual_time -1:
+                        if price != None and price !=0:
+                            if userData[5]:
+                                stored_time = datetime.strptime(userData[5], "%Y-%m-%d %H:%M:%S")
+                                now = datetime.now()
+                                difference = (now - stored_time).days
+                                if difference < 30:
+                                    orders_list.append(order)
+                        else:
+                            orders_list.append(order)
+            else:
+                orders_list.append(order)
                         
         if len(orders_list) == 0:
             peganatorMessage.text = "*Пока предложений нету*"
@@ -131,8 +145,11 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         peganatorMessage.text = "*Личный кабинет\n"
         userData = await dataBase.get_user_userid(userid = user.id)
         price = await dataBase.get_settings('price')
+        relevance_allowed = await dataBase.get_settings('relevance_allowed')
+        actual_time = await dataBase.get_settings('actual_time')
+        actual_time = max(1,actual_time) if actual_time else 1
         
-        if price[0] is not None and price[0] != 0 and price[0] != '':
+        if price is not None and price != 0 and price != '':
             peganatorMessage.date = [1]
             if userData[5]:
                 stored_time = datetime.strptime(userData[5], "%Y-%m-%d %H:%M:%S")
@@ -146,17 +163,21 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
                 peganatorMessage.text += "Купите подписку, чтобы ваши обьявления появились.\n"
         else:
             peganatorMessage.date = [0]
-        if userData[8]:
-            stored_time = datetime.strptime(userData[8], "%Y-%m-%d %H:%M:%S")
-            now = datetime.now()
-            difference = (now - stored_time).days
-            
-            if difference > 2:
-                peganatorMessage.text += "Подтвердить актуальность ваших обьявлений, чтобы они появились пользователям!*"
+      
+        if bool(relevance_allowed):
+            if userData[8]:
+                stored_time = datetime.strptime(userData[8], "%Y-%m-%d %H:%M:%S")
+                now = datetime.now()
+                difference = (now - stored_time).days
+                
+                if difference > actual_time - 1:
+                    peganatorMessage.text += "Подтвердите актуальность ваших обьявлений, чтобы они появились пользователям!*"
+                else:
+                    peganatorMessage.text += f"Ваши обьявления еще актуальны {actual_time - difference} дня.*"
             else:
-                peganatorMessage.text += f"Ваши обьявления еще актуальны {3 - difference} дня.*"
+                peganatorMessage.text += "Подтвердить актуальность ваших обьявлений, чтобы они появились пользователям!*"
         else:
-            peganatorMessage.text += "Подтвердить актуальность ваших обьявлений, чтобы они появились пользователям!*"
+            peganatorMessage.text += "*"
         
     elif action == "deleateNumber":
         peganatorMessage.text = "*Выберите номер, который хотите удалить*"
@@ -239,7 +260,11 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         peganatorMessage.text = "*Успешно!\nВаш товар отправлен на расмотренние администратором.*"
         peganatorMessage.page = 1
         peganatorMessage.last = "profile"
-        
+        photos = dataState.get('photos', None)
+        photos_str = None
+        if photos is not None:
+            photos_str = ",".join(photos) 
+            
         url = f'https://t.me/{user.username}' if user.username != None and  user.username  != '' \
             else call.message.from_user.url
             
@@ -249,8 +274,18 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
             number = data['number'],
             comment = data['coment'],
             price = data['price'],
+            photo = photos_str
         )
+        auto_allowed = await dataBase.get_settings('auto_allowed')
         
+        if bool(auto_allowed):
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            await dataBase.set_user_data(
+                    userid =  user.id,
+                    key = "actual_time",
+                    value = current_time
+            )
+            
         order = await dataBase.get_order_id(ids)
         
         admin_text = f"Новая заявка:\n\nАйди = {order[0]}\nИмя = {user.first_name}\nUserid = {order[1]}\nНомер = {order[2]}\nКоменнтарий = {order[3]}\nЦена = {order[4]}\nСтатус = {order[6]}"    
@@ -261,14 +296,22 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
             data = [ids],
             last = "menu",
             message = call.message,
+            fileid = photos
         )
         
-
-        
         await state.clear()
-
     
     elif action == "acceptActual":
+
+        relevance_allowed = await dataBase.get_settings('relevance_allowed')
+        if bool(relevance_allowed) == False:
+            return call.answer(
+                show_alert=True,
+                text = "Потдверждать актуальность нету необходимости."
+            
+        )
+            
+
         peganatorMessage.text = "*Актуальность ваших номеров подтверждина.*"
         peganatorMessage.page = 1
         peganatorMessage.last = "profile"
@@ -283,19 +326,49 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         await state.clear()
         users = await dataBase.get_users()
         price = await dataBase.get_settings('price')
-        available = await dataBase.get_settings('window_allowed')
-        peganatorMessage.text = f"*Выберите функцию\n\nВсего пользователей = {len(users)}\nТеукущая стоимость = {price[0]}\nДоступность витрины всем = {'да' if bool(available[0]) else 'нет'}*"
+        window_allowed = await dataBase.get_settings('window_allowed')
+        relevance_allowed = await dataBase.get_settings('relevance_allowed')
+        auto_allowed = await dataBase.get_settings('auto_allowed')
+        actual_time = await dataBase.get_settings('actual_time')
+        peganatorMessage.text = f"*Выберите функцию\n\nВсего пользователей = {len(users)}\nТеукущая стоимость = {price}\nДоступность витрины всем = {boolToStr(window_allowed)}\nДоступность актуальности = {boolToStr(relevance_allowed)}\nАвто актуальность, после создания обьявления = {boolToStr(auto_allowed)}\nВремя потдверждения актуальности = {actual_time}дня*"
         peganatorMessage.page = 10
         peganatorMessage.last = "menu"
     
-    elif action == "set_window_allowed":
-        available = await dataBase.get_settings('window_allowed')
-        new_available = 0 if available[0] == 1 else 1
-        await dataBase.set_settings_data("window_allowed", new_available)
+    elif action == "set_actual_time":
+        peganatorMessage.text = "*Отправьте число - количество дней, которое будет ставиться для потдверждения актуальной информации*"
         peganatorMessage.page = 1
-        peganatorMessage.text = f"*Вы изменили доступность витрины, новое значение = {'да' if bool(new_available) else 'нет'}*"
+        peganatorMessage.last = "adminPanel"
+        await state.set_state(FormSetActualTime.time)
+    
+    
+    elif action == "set_window_allowed":
+        
+        available = await dataBase.get_settings('window_allowed')
+        new_available = swipeInt(available)
+        await dataBase.set_settings_data("window_allowed", new_available)
+        word = boolToStr(new_available)
+        peganatorMessage.page = 1
+        peganatorMessage.text = f"*Вы изменили доступность витрины, новое значение = {word}*"
         peganatorMessage.last = 'adminPanel'
     
+    elif action == "set_actual_allowed":
+        available = await dataBase.get_settings('relevance_allowed')
+        new_available = swipeInt(available)
+        await dataBase.set_settings_data("relevance_allowed", new_available)
+        word = boolToStr(new_available)
+        peganatorMessage.page = 1
+        peganatorMessage.text = f"*Вы изменили доступность актуальности, новое значение = {word}*"
+        peganatorMessage.last = 'adminPanel'
+        
+    elif action == "set_actual_auto":
+        available = await dataBase.get_settings('auto_allowed')
+        new_available = swipeInt(available)
+        await dataBase.set_settings_data("auto_allowed", new_available)
+        word = boolToStr(new_available)
+        peganatorMessage.page = 1
+        peganatorMessage.text = f"*Вы изменили доступность актуальности, новое значение = {word}*"
+        peganatorMessage.last = 'adminPanel'
+        
     elif action == "deleateAdministrator":
         peganatorMessage.text = "*Выберите пользователя, у которого хотите забрать права администратора*" 
         peganatorMessage.page = 11
@@ -335,6 +408,9 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         for order in ordersModerations:
             user_delta = await dataBase.get_user_userid(order[1])
             admin_text = f"Новая заявка:\n\nАйди = {order[0]}\nИмя = {user_delta[2]}\nUserid = {order[1]}\nНомер = {order[2]}\nКоменнтарий = {order[3]}\nЦена = {order[4]}\nСтатус = {order[6]}"    
+            photos = order[7]
+            if photos is not None:
+                photos = photos.split(',')
             await Notifications.send_notifs(
                 text = admin_text,
                 page = 9,
@@ -342,7 +418,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
                 last = "menu",
                 message = call.message,
                 users = [userData],
-                fileid=order[7]
+                fileid=photos
             )
         for userDt in  usersModerations:
             admin_text = f"Заяка!\n\nПервое имя = {userDt[2]}\nВторое имя = {userDt[3]}\nuserid = {userDt[1]}\nEmail = {userDt[7]}\nНомер телефона = {userDt[6]}"
@@ -368,7 +444,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         if price != 0 and price != None:
             payUrl = await cryptobot.create_payment(
                 crypto = callback_data.data,
-                amount_rub = price[0]
+                amount_rub = price
             )
             peganatorMessage.date = [payUrl]
             peganatorMessage.page = 13
@@ -401,6 +477,17 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
                 )
     
     elif action == "deleateMessage":
+        messagedeleate = dataState.get('deleatemessage', None)
+        if messagedeleate is not None:
+            await state.clear()
+            messagedeleate = messagedeleate.split(',')
+            for message in messagedeleate:
+                await bot.delete_message(
+                    chat_id = user.id,
+                    message_id = message
+                )
+           
+                
         await call.message.delete()
         return
     
@@ -408,25 +495,81 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         order = await dataBase.get_order_id(callback_data.data)
         text = f"*Номер: {order[2]}\nКомментарий: {order[3]}\nЦена: {order[4]}*"
         text = FormatedText.formatMarkdownV2(text)
-        await call.message.bot.send_photo(
-            chat_id = user.id,
-            photo = order[7],
-            caption  = text,
-            reply_markup=fabric.pagination(
-                15,
-                user.id,
-                "ordersList",
-                [order[5]]
-            ),
-                parse_mode='MarkdownV2'
-        )
-
+        photos = order[7].split(',')
+        if len(photos) == 1:
+            await call.message.bot.send_photo(
+                chat_id = user.id,
+                photo = order[7],
+                caption  = text,
+                reply_markup=fabric.pagination(
+                    15,
+                    user.id,
+                    "ordersList",
+                    [order[5]]
+                ),
+                    parse_mode='MarkdownV2'
+            )
+        else:
+            media = []
+            for index, photo in enumerate(photos):
+                if index == 0:
+                    media.append(types.InputMediaPhoto(media= photo))
+                else:
+                    media.append(types.InputMediaPhoto(media= photo))
+            
+            message = await call.message.bot.send_media_group(
+                chat_id=user.id,
+                media=media,
+            )
+            await state.update_data(deleatemessage=", ".join(str(msg.message_id) for msg in message))
+            await call.message.bot.send_message(
+                    chat_id=user.id,
+                    text=text,
+                    reply_markup=fabric.pagination(
+                        15,
+                        user.id,
+                        "ordersList",
+                        [order[5]]
+                    ),
+                    parse_mode='MarkdownV2'
+                )
         return
     
     await peganatorMessage.callEditText()
 
 
-@router.message(FormSetPrice.price)
+
+@router.message(FormSetActualTime.time, F.text)
+async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
+    await message.delete()    
+    data = await state.get_data()
+    if message.text.isdigit():
+
+        text = f"*Успешно!\nНовое время для потдверждения актуальной информации - {message.text}дня.*"
+        await state.clear()
+        await dataBase.set_settings_data(
+            key = 'actual_time',
+            value = message.text
+        )
+    
+    else:
+        text = "*Ошибка  вы ввели не число!\nУкажите новое количество дней, которое будет ставиться для потдверждения актуальной информации*"
+    
+    text = FormatedText.formatMarkdownV2(text)
+    
+    await bot.edit_message_text(
+        text = text,
+        reply_markup=fabric.pagination(
+            1,
+            message.from_user.id,
+            'adminPanel',
+            []
+        ),
+        parse_mode='MarkdownV2',
+        message_id=data['lastid'],
+        chat_id=message.chat.id
+    )
+@router.message(FormSetPrice.price, F.text)
 async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
     await message.delete()    
     data = await state.get_data()

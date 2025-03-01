@@ -53,6 +53,18 @@ admin_menulist = [
     {
         "title" : "Доступность витрины",
         "action" : "set_window_allowed"
+    },
+    {
+        "title" : "Доступность актуальности",
+        "action" : "set_actual_allowed"
+    },
+    {
+        "title" : "Доступность авто актуальность",
+        "action" : "set_actual_auto"
+    },
+    {
+        "title" : "Установить время актуальности",
+        "action" : "set_actual_time"
     }
 ]
 profile_button = {
