@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-
 from aiogram import Router, F, types
 from aiogram.utils.keyboard import CallbackData
 from aiogram.fsm.context import  FSMContext
-from aiogram.fsm.state import  State,StatesGroup
+from aiogram.fsm.state import State, StatesGroup
 from keyboards import fabric
 from aiogram.types import CallbackQuery
 from Serializers.SerializersDefauls import UserSerializer,PeganatorMessageSerializer
@@ -11,22 +10,20 @@ from utilis.utilis import FormatedText
 from forms.formRegisterProfile import FormRegisterProfile
 from API.SenderMessage import Notifications
 from API import cryptobot 
+
 from forms.formAddNumber import FormAddNumber
 from forms.FormAddAdministrator import FormAddAdministrator
-
 from forms.FormEditNumber import FormEditNumber
+from forms.FormSetPrice import FormSetPrice
+from forms.FormSetActualTime import FormSetActualTime
+
 from main import Bot
 from db import Database
+from utilis.BasicFunctions import Basic, Order
 from datetime import datetime
 
 router = Router()
 dataBase = Database("DB.db")
-
-class FormSetPrice(StatesGroup):
-    price = State()
-
-class FormSetActualTime(StatesGroup):
-    time = State()
 
  
 class Pagination(CallbackData, prefix='pag'):
@@ -35,11 +32,7 @@ class Pagination(CallbackData, prefix='pag'):
     last : str
     data : str
 
-def swipeInt(delta):
-    return 0 if delta == 1 else 1
 
-def boolToStr(word):
-    return 'да' if bool(word) else 'нет'
 
 @router.callback_query(Pagination.filter())
 async def pagination_handler(call: CallbackQuery, callback_data: Pagination,state: FSMContext,bot:Bot):
@@ -256,40 +249,19 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         return 
 
     elif action == "formAddNumberPhotoSkeep":
-        data = await state.get_data()
+    
         peganatorMessage.text = "*Успешно!\nВаш товар отправлен на расмотренние администратором.*"
         peganatorMessage.page = 1
         peganatorMessage.last = "profile"
         photos = dataState.get('photos', None)
-        photos_str = None
-        if photos is not None:
-            photos_str = ",".join(photos) 
-            
-        url = f'https://t.me/{user.username}' if user.username != None and  user.username  != '' \
-            else call.message.from_user.url
-            
-        ids = await dataBase.add_order(
-            userid = user.id,
-            url =  url,
-            number = data['number'],
-            comment = data['coment'],
-            price = data['price'],
-            photo = photos_str
-        )
-        auto_allowed = await dataBase.get_settings('auto_allowed')
         
-        if bool(auto_allowed):
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            await dataBase.set_user_data(
-                    userid =  user.id,
-                    key = "actual_time",
-                    value = current_time
-            )
+        photos_str = await Order.format_photos_str(photos)
+        ids = await Order.add_object(dataState, photos_str, call.message)
+        await Order.update_actual_time(call.message)
             
         order = await dataBase.get_order_id(ids)
+        admin_text = await Order.admin_text_add(order, call.message)
         
-        admin_text = f"Новая заявка:\n\nАйди = {order[0]}\nИмя = {user.first_name}\nUserid = {order[1]}\nНомер = {order[2]}\nКоменнтарий = {order[3]}\nЦена = {order[4]}\nСтатус = {order[6]}"    
-    
         await Notifications.send_all_admins(
             text = admin_text,
             page = 9,
@@ -330,7 +302,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         relevance_allowed = await dataBase.get_settings('relevance_allowed')
         auto_allowed = await dataBase.get_settings('auto_allowed')
         actual_time = await dataBase.get_settings('actual_time')
-        peganatorMessage.text = f"*Выберите функцию\n\nВсего пользователей = {len(users)}\nТеукущая стоимость = {price}\nДоступность витрины всем = {boolToStr(window_allowed)}\nДоступность актуальности = {boolToStr(relevance_allowed)}\nАвто актуальность, после создания обьявления = {boolToStr(auto_allowed)}\nВремя потдверждения актуальности = {actual_time}дня*"
+        peganatorMessage.text = f"*Выберите функцию\n\nВсего пользователей = {len(users)}\nТеукущая стоимость = {price}\nДоступность витрины всем = {Basic.boolToStr(window_allowed)}\nДоступность актуальности = {Basic.boolToStr(relevance_allowed)}\nАвто актуальность, после создания обьявления = {Basic.boolToStr(auto_allowed)}\nВремя потдверждения актуальности = {actual_time}дня*"
         peganatorMessage.page = 10
         peganatorMessage.last = "menu"
     
@@ -340,31 +312,30 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         peganatorMessage.last = "adminPanel"
         await state.set_state(FormSetActualTime.time)
     
-    
     elif action == "set_window_allowed":
         
         available = await dataBase.get_settings('window_allowed')
-        new_available = swipeInt(available)
+        new_available = Basic.swipeInt(available)
         await dataBase.set_settings_data("window_allowed", new_available)
-        word = boolToStr(new_available)
+        word = Basic.boolToStr(new_available)
         peganatorMessage.page = 1
         peganatorMessage.text = f"*Вы изменили доступность витрины, новое значение = {word}*"
         peganatorMessage.last = 'adminPanel'
     
     elif action == "set_actual_allowed":
         available = await dataBase.get_settings('relevance_allowed')
-        new_available = swipeInt(available)
+        new_available = Basic.swipeInt(available)
         await dataBase.set_settings_data("relevance_allowed", new_available)
-        word = boolToStr(new_available)
+        word = Basic.boolToStr(new_available)
         peganatorMessage.page = 1
         peganatorMessage.text = f"*Вы изменили доступность актуальности, новое значение = {word}*"
         peganatorMessage.last = 'adminPanel'
         
     elif action == "set_actual_auto":
         available = await dataBase.get_settings('auto_allowed')
-        new_available = swipeInt(available)
+        new_available = Basic.swipeInt(available)
         await dataBase.set_settings_data("auto_allowed", new_available)
-        word = boolToStr(new_available)
+        word = Basic.boolToStr(new_available)
         peganatorMessage.page = 1
         peganatorMessage.text = f"*Вы изменили доступность актуальности, новое значение = {word}*"
         peganatorMessage.last = 'adminPanel'
@@ -536,66 +507,3 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         return
     
     await peganatorMessage.callEditText()
-
-
-
-@router.message(FormSetActualTime.time, F.text)
-async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
-    await message.delete()    
-    data = await state.get_data()
-    if message.text.isdigit():
-
-        text = f"*Успешно!\nНовое время для потдверждения актуальной информации - {message.text}дня.*"
-        await state.clear()
-        await dataBase.set_settings_data(
-            key = 'actual_time',
-            value = message.text
-        )
-    
-    else:
-        text = "*Ошибка  вы ввели не число!\nУкажите новое количество дней, которое будет ставиться для потдверждения актуальной информации*"
-    
-    text = FormatedText.formatMarkdownV2(text)
-    
-    await bot.edit_message_text(
-        text = text,
-        reply_markup=fabric.pagination(
-            1,
-            message.from_user.id,
-            'adminPanel',
-            []
-        ),
-        parse_mode='MarkdownV2',
-        message_id=data['lastid'],
-        chat_id=message.chat.id
-    )
-@router.message(FormSetPrice.price, F.text)
-async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
-    await message.delete()    
-    data = await state.get_data()
-    if message.text.isdigit():
-
-        text = f"*Успешно!\nНовая стоимость за подписку - {message.text}.*"
-        await state.clear()
-        await dataBase.set_settings_data(
-            key = 'price',
-            value = message.text
-        )
-    
-    else:
-        text = "*Ошибка вы ввели не число!\nУкажите новую стоимость в долларах за месяц ( просто число )*"
-    
-    text = FormatedText.formatMarkdownV2(text)
-    
-    await bot.edit_message_text(
-        text = text,
-        reply_markup=fabric.pagination(
-            1,
-            message.from_user.id,
-            'adminPanel',
-            []
-        ),
-        parse_mode='MarkdownV2',
-        message_id=data['lastid'],
-        chat_id=message.chat.id
-    )

@@ -41,9 +41,11 @@ class Database:
     async def get_admins(self):
         await self.cursor.execute("SELECT * FROM users WHERE role ='admin'")
         return await self.cursor.fetchall()
+    
     async def get_users_moderations(self):
         await self.cursor.execute("SELECT * FROM users WHERE role ='moderation'")
         return await self.cursor.fetchall()
+    
     async def set_user_data(self, userid, key, value):
         await self.cursor.execute(
             f"UPDATE users SET {key} = ? WHERE userid = ?", (value, userid)
@@ -54,8 +56,8 @@ class Database:
         await self.cursor.execute(f"UPDATE orders SET {key} = ? WHERE id = ?",(value,ids))
         await self.connection.commit() 
         
-    async def add_order(self, userid, url, number, comment, price, photo = None):
-        await self.cursor.execute("INSERT INTO orders (userid, url, number, comment, price, photo) VALUES (?,?,?,?,?,?)", (userid, url, number, comment, price, photo))
+    async def add_order(self, userid, url, number, comment, price, firstname, photo = None):
+        await self.cursor.execute("INSERT INTO orders (userid, url, number, comment, price, photo, firstname) VALUES (?,?,?,?,?,?,?)", (userid, url, number, comment, price, photo, firstname))
         order_id = self.cursor.lastrowid  
         await self.connection.commit()
         return order_id 
@@ -74,6 +76,7 @@ class Database:
     async def get_all_orders_moderation(self):
         await self.cursor.execute("SELECT * FROM orders where status = 'moderation'")
         return await self.cursor.fetchall()
+    
     async def get_order_id(self, ids):
         await self.cursor.execute("SELECT * FROM orders where id = ?",(ids,))
         return await self.cursor.fetchone()

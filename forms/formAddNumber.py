@@ -6,6 +6,7 @@ from main import Bot
 from keyboards import fabric
 from db import Database
 from utilis.utilis import FormatedText
+from utilis.BasicFunctions import Order
 from datetime import datetime
 
 
@@ -91,41 +92,20 @@ async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
 async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
     await message.delete()
     data = await state.get_data()
-    
     photos = data.get('photos', [])
     photos.append(message.photo[0].file_id)
-    
     await state.update_data(photos = photos)
-    
     text = f"*Успешно!\nОтправьте еще фото или нажмите кнопку 'Готово'\nСейчас фото = {len(photos)}\nМаксимум = 5*"
     
     if len(photos) >= 5:
         await state.clear()
         text = "*Успешно!\nВаш товар отправлен на расмотренние администратором.*"
-        photos_str = ",".join(photos) 
-        url = f'https://t.me/{message.from_user.username}' if message.from_user.username != None and  message.from_user.username  != '' \
-        else message.from_user.url
-        ids = await dataBase.add_order(
-            userid = message.from_user.id,
-            url =  url,
-            number = data['number'],
-            comment = data['coment'],
-            price = data['price'],
-            photo = photos_str
-        )
-        auto_allowed = await dataBase.get_settings('auto_allowed')
-        
-        if bool(auto_allowed):
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            await dataBase.set_user_data(
-                    userid =  message.from_user.id,
-                    key = "actual_time",
-                    value = current_time
-            )
+        photos_str = await Order.format_photos_str(photos)
+        ids = await Order.add_object(data, photos_str, message)
+        await Order.update_actual_time(message)
             
         order = await dataBase.get_order_id(ids)
-        
-        admin_text = f"Новая заявка:\n\nАйди = {order[0]}\nИмя = {message.from_user.first_name}\nUserid = {order[1]}\nНомер = {order[2]}\nКоменнтарий = {order[3]}\nЦена = {order[4]}\nСтатус = {order[6]}"    
+        admin_text = await Order.admin_text_add(order, message)
     
         await Notifications.send_all_admins(
             text = admin_text,
@@ -138,7 +118,6 @@ async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
         
         
     text = FormatedText.formatMarkdownV2(text)
-    
     await bot.edit_message_text(
         text = text,
         reply_markup=fabric.pagination(
@@ -151,4 +130,3 @@ async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
         message_id=data['lastid'],
         chat_id=message.chat.id
     )
-    

@@ -16,6 +16,7 @@ class FormAddAdministrator(StatesGroup):
 async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
     await message.delete()    
     data = await state.get_data()
+    
     if message.text.isdigit():
         user = await dataBase.get_user_userid(userid = int(message.text))
         if user is None:
@@ -31,6 +32,7 @@ async def send_welcome(message : types.Message,state: FSMContext,bot:Bot):
     
     else:
         text = "*Ошибка вы ввели не число!\nУкажите userid telegram пользователя, которому хотите выдать права администратора*"
+        
     text = FormatedText.formatMarkdownV2(text)
     await bot.edit_message_text(
         text = text,
