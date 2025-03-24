@@ -31,7 +31,27 @@ profile_menu = [
         "title" : "Удалить номер",
         "action" : "deleateNumber"
     },
+    {
+        "title" : "Поиск номера",
+        "action" : "foundMyNumber"
+    },
+    {
+        "title" : "Массовое добавление",
+        "action" : "massAdd"
+    }
 ]
+
+massAddMenu = [
+    {
+        "title" : "Добавление с фото",
+        "action" : "massAddPhoto"
+    },
+    {
+        "title" : "Добавление без фото",
+        "action" : "massAddText"
+    },
+]
+
 
 admin_menulist = [
     {

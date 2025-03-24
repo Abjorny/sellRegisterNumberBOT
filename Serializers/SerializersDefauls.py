@@ -53,13 +53,14 @@ class PeganatorMessageSerializer:
         self.last = ''
         self.page = 0
         self.date = []
+        self.id = 0
         self.state = state
 
     async def callEditText(self):
         self.text = FormatedText.formatMarkdownV2(text=self.text)
         message =  await self.call.message.edit_text(
             self.text,
-            reply_markup=fabric.pagination(self.page,self.user.id,self.last,self.date),
+            reply_markup=fabric.pagination(self.page,self.id,self.last,self.date),
             parse_mode=ParseMode.MARKDOWN_V2,
             disable_web_page_preview = True
         )

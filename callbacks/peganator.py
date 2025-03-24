@@ -2,7 +2,6 @@
 from aiogram import Router, F, types
 from aiogram.utils.keyboard import CallbackData
 from aiogram.fsm.context import  FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from keyboards import fabric
 from aiogram.types import CallbackQuery
 from Serializers.SerializersDefauls import UserSerializer,PeganatorMessageSerializer
@@ -16,6 +15,9 @@ from forms.FormAddAdministrator import FormAddAdministrator
 from forms.FormEditNumber import FormEditNumber
 from forms.FormSetPrice import FormSetPrice
 from forms.FormSetActualTime import FormSetActualTime
+from forms.FormFoundMyNumber import FormFoundMyNumber
+from forms.FormMassAddText import FormMassAddText
+from forms.FormMassAddPhoto import FormMassAddPhoto
 
 from main import Bot
 from db import Database
@@ -32,6 +34,139 @@ class Pagination(CallbackData, prefix='pag'):
     last : str
     data : str
 
+async def swipeMessageKeyboard(message : types.Message, state : FSMContext,
+                               page : int, this_page, pageFabric: int):
+    
+    last = "max" if page * 10 + 10 >= len(this_page) else "min"
+    
+    await message.edit_reply_markup(
+        reply_markup = fabric.pagination(
+            page = pageFabric,
+            last = last,
+            id = page,
+            elem = this_page
+            
+            ),
+    )
+    
+    await state.update_data(
+        page = page
+    )
+    
+@router.callback_query(F.data == "next-page")
+async def pagination_handler(call: CallbackQuery,state: FSMContext):
+    dataState = await state.get_data()
+    pageFabric = 3
+    
+    if dataState['type_query'] == "list":
+        this_page = await Order.get_all_orders()
+    
+    elif dataState['type_query'] == "search":
+        this_page = await dataBase.search_orders(dataState['serach'])
+    
+    elif dataState['type_query'] == "searchProfile":
+        this_page = await dataBase.search_orders_by_user(dataState['serach'], call.message.chat.id) 
+        pageFabric = 17
+    
+    elif dataState["type_query"] == "profile":
+        this_page = await dataBase.get_all_orders_userid(call.message.chat.id)
+        pageFabric = 17
+    page = dataState['page'] + 1
+    
+    await swipeMessageKeyboard(
+        message = call.message,
+        state = state,
+        page = page,
+        this_page = this_page,
+        pageFabric = pageFabric
+    )
+
+@router.callback_query(F.data == "back-page")
+async def pagination_handler(call: CallbackQuery,state: FSMContext):
+    dataState = await state.get_data()
+    pageFabric = 3
+    if dataState['type_query'] == "list":
+        this_page = await Order.get_all_orders()
+    
+    elif dataState['type_query'] == "search":
+        this_page = await dataBase.search_orders(dataState['serach'])
+    
+    elif dataState['type_query'] == "searchProfile":
+        this_page = await dataBase.search_orders_by_user(dataState['serach'], call.message.chat.id) 
+        pageFabric = 17
+    
+    elif dataState["type_query"] == "profile":
+        this_page = await dataBase.get_all_orders_userid(call.message.chat.id)
+        pageFabric = 17
+    page = max(0 , dataState['page'] - 1)
+    
+    await swipeMessageKeyboard(
+        message = call.message,
+        state = state,
+        page = page,
+        this_page = this_page,
+        pageFabric = pageFabric
+    )
+    
+@router.callback_query(F.data == "menu")
+async def pagination_handler(call: CallbackQuery,state: FSMContext,):
+    peganatorMessage = PeganatorMessageSerializer(call = call,
+                                                  state = state)
+    user = UserSerializer(call.message)
+    await state.clear()
+    peganatorMessage.text = f"*Доброго дня {user.username}!\n" \
+        "Выберите интересующий пункт меню.*"
+    peganatorMessage.page = 0
+    peganatorMessage.last = "menu"
+    peganatorMessage.date = [await user.get_role()]
+    await peganatorMessage.callEditText()
+
+@router.callback_query(F.data == "profile")
+async def pagination_handler(call: CallbackQuery,state: FSMContext,):
+    peganatorMessage = PeganatorMessageSerializer(call = call,
+                                                  state = state)
+    user = UserSerializer(call.message)
+    await state.clear()
+    peganatorMessage.text = "*Личный кабинет\n"
+    peganatorMessage.page = 4
+    peganatorMessage.last = "menu"
+    userData = await dataBase.get_user_userid(userid = user.id)
+    price = await dataBase.get_settings('price')
+    relevance_allowed = await dataBase.get_settings('relevance_allowed')
+    actual_time = await dataBase.get_settings('actual_time')
+    actual_time = max(1,actual_time) if actual_time else 1
+    
+    if price is not None and price != 0 and price != '':
+        peganatorMessage.date = [1]
+        if userData[5]:
+            stored_time = datetime.strptime(userData[5], "%Y-%m-%d %H:%M:%S")
+            now = datetime.now()
+            difference = (now - stored_time).days
+            if difference >=30:
+                peganatorMessage.text += "Купите подписку, чтобы ваши обьявления появились.\n"
+            else:
+                peganatorMessage.text += f"Ваша подписка доступна {30 - difference} дней\n"
+        else:
+            peganatorMessage.text += "Купите подписку, чтобы ваши обьявления появились.\n"
+    else:
+        peganatorMessage.date = [0]
+    
+    if bool(relevance_allowed):
+        if userData[8]:
+            stored_time = datetime.strptime(userData[8], "%Y-%m-%d %H:%M:%S")
+            now = datetime.now()
+            difference = (now - stored_time).days
+            
+            if difference > actual_time - 1:
+                peganatorMessage.text += "Подтвердите актуальность ваших обьявлений, чтобы они появились пользователям!*"
+            else:
+                peganatorMessage.text += f"Ваши обьявления еще актуальны {actual_time - difference} дня.*"
+        else:
+            peganatorMessage.text += "Подтвердить актуальность ваших обьявлений, чтобы они появились пользователям!*"
+    else:
+        peganatorMessage.text += "*"
+    await peganatorMessage.callEditText()
+
 
 
 @router.callback_query(Pagination.filter())
@@ -39,9 +174,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
     action = callback_data.action
     dataState = await state.get_data()
     user = UserSerializer(call.message)
-    
-    peganatorMessage = PeganatorMessageSerializer(call = call,
-                                                  state = state)
+    peganatorMessage = PeganatorMessageSerializer(call = call, state = state)
     
     if action == "menu":
         await state.clear()
@@ -50,7 +183,7 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
         peganatorMessage.page = 0
         peganatorMessage.last = "menu"
         peganatorMessage.date = [await user.get_role()]
-    
+       
     elif action == "registerProfile":
         role = await user.get_role()
         peganatorMessage.page = 1
@@ -97,29 +230,8 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
             )
             return
         
-        orders = await dataBase.get_all_orders_active()
         price = await dataBase.get_settings('price')
-        orders_list = []
-        
-        for order in orders:
-            userData = await dataBase.get_user_userid(order[1])
-            if bool(relevance_allowed):
-                if userData[8]:
-                    stored_time = datetime.strptime(userData[8], "%Y-%m-%d %H:%M:%S")
-                    now = datetime.now()
-                    difference = (now - stored_time).days
-                    if difference <= actual_time -1:
-                        if price != None and price !=0:
-                            if userData[5]:
-                                stored_time = datetime.strptime(userData[5], "%Y-%m-%d %H:%M:%S")
-                                now = datetime.now()
-                                difference = (now - stored_time).days
-                                if difference < 30:
-                                    orders_list.append(order)
-                        else:
-                            orders_list.append(order)
-            else:
-                orders_list.append(order)
+        orders_list = await Order.get_all_orders()
                         
         if len(orders_list) == 0:
             peganatorMessage.text = "*Пока предложений нету*"
@@ -130,6 +242,15 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
             peganatorMessage.text = "*Нажмите на интересующие вас предложение!*"
             peganatorMessage.page = 3
             peganatorMessage.last = "menu"
+            peganatorMessage.id = 0
+            await state.update_data(
+                page = 0,
+                type_query = "list"
+            )
+    
+            if len(orders_list) < 10:
+                peganatorMessage.last = "max"
+                
             peganatorMessage.date = orders_list
     
     elif action == "profile":
@@ -192,10 +313,24 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
     
     elif action == "listNumbers":
         await state.clear()
+        last = ""
+        orders_list = await dataBase.get_all_orders_userid(user.id)
+        await state.update_data(
+            page = 0,
+            type_query = "profile",
+        )
+        if len(orders_list) < 10: last = "max"
         peganatorMessage.text = "*Ваши номера*"
-        peganatorMessage.page = 6
+        peganatorMessage.page = 17
+        peganatorMessage.last = last
+        peganatorMessage.date = orders_list
+    
+    elif action == "foundMyNumber":
+        await state.clear()
+        peganatorMessage.text = "*Введите ваш поисковой запрос*"
+        peganatorMessage.page = 1
         peganatorMessage.last = "profile"
-        peganatorMessage.date = await dataBase.get_all_orders_userid(user.id)
+        await state.set_state(FormFoundMyNumber.query)
     
     elif action == "getOrder":
         orderId = None
@@ -203,10 +338,11 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
             orderId = dataState['thisOrderId']
         except:
             orderId = callback_data.data
+            
         order = await dataBase.get_order_id(orderId)
         await state.update_data(thisOrderId = orderId)
         peganatorMessage.page = 7
-        peganatorMessage.last = "listNumbers"
+        peganatorMessage.last = "profile"
         peganatorMessage.text = f"*Информация об номере:\n\nАйди = {order[0]}\nНомер = {order[2]}\nКоменнтарий = {order[3]}\nЦена = {order[4]}\nСтатус = {order[6]}*"    
         
         peganatorMessage.date = [order[0]]
@@ -450,13 +586,16 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
     elif action == "deleateMessage":
         messagedeleate = dataState.get('deleatemessage', None)
         if messagedeleate is not None:
-            await state.clear()
+            
             messagedeleate = messagedeleate.split(',')
             for message in messagedeleate:
-                await bot.delete_message(
-                    chat_id = user.id,
-                    message_id = message
-                )
+                try:
+                    await bot.delete_message(
+                        chat_id = user.id,
+                        message_id = message
+                    )
+                except:
+                    pass
            
                 
         await call.message.delete()
@@ -464,10 +603,13 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
     
     elif action == "openOrder":
         order = await dataBase.get_order_id(callback_data.data)
-        text = f"*Номер: {order[2]}\nКомментарий: {order[3]}\nЦена: {order[4]}*"
+        text = f"*Номер: {order[2]}\nИмя: {order[8]}\nКомментарий: {order[3]}\nЦена: {order[4]}*"
         text = FormatedText.formatMarkdownV2(text)
-        photos = order[7].split(',')
-        if len(photos) == 1:
+        photos = []
+        if order[7] is not None:
+            photos = order[7].split(',')
+        
+        if  len(photos) == 1:
             await call.message.bot.send_photo(
                 chat_id = user.id,
                 photo = order[7],
@@ -487,12 +629,12 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
                     media.append(types.InputMediaPhoto(media= photo))
                 else:
                     media.append(types.InputMediaPhoto(media= photo))
-            
-            message = await call.message.bot.send_media_group(
-                chat_id=user.id,
-                media=media,
-            )
-            await state.update_data(deleatemessage=", ".join(str(msg.message_id) for msg in message))
+            if len(media) > 0:
+                message = await call.message.bot.send_media_group(
+                    chat_id=user.id,
+                    media=media,
+                )
+                await state.update_data(deleatemessage=", ".join(str(msg.message_id) for msg in message))
             await call.message.bot.send_message(
                     chat_id=user.id,
                     text=text,
@@ -506,4 +648,25 @@ async def pagination_handler(call: CallbackQuery, callback_data: Pagination,stat
                 )
         return
     
+    elif action == "massAdd":
+        peganatorMessage.page = 18
+        peganatorMessage.last = "profile"
+        peganatorMessage.text = "*Выберите нужный вид массового добавления номмеров*"
+        await state.clear()
+    
+    elif action == "massAddPhoto":
+        peganatorMessage.page = 1
+        peganatorMessage.last = "massAdd"
+        peganatorMessage.text = "*Отправьте zip архив в формате, каждый номер - папка, название папки - значение номера и его информация(), фото в папке - фото номера. пример:\n\n1CB-120-AFS | комментарий | цена\nAS0-153-ZVX | комментарий | цена\n\nМаксимум будет принято у каждого номера 6 фото*"
+        await state.clear()
+        await state.set_state(FormMassAddPhoto.archive)
+        
+        
+    elif action == "massAddText":
+        peganatorMessage.page = 1
+        peganatorMessage.last = "massAdd"
+        peganatorMessage.text = "*Отправьте список номеров в виде сообщения, где каждый номер отдельная строка и информация отделяется через |, пример:\n\n1CB-120-AFS | комментарий | цена\nAS0-153-ZVX | комментарий | цена*"
+        await state.clear()
+        await state.set_state(FormMassAddText.text)
+        
     await peganatorMessage.callEditText()

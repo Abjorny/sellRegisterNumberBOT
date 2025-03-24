@@ -62,6 +62,24 @@ class Database:
         await self.connection.commit()
         return order_id 
     
+    async def search_orders(self, keyword):
+        query = """
+        SELECT * FROM orders
+        WHERE (number LIKE ? OR comment LIKE ?) AND status = 'active'
+        """
+        params = (f"%{keyword}%", f"%{keyword}%")
+        await self.cursor.execute(query, params)
+        return await self.cursor.fetchall()
+
+    async def search_orders_by_user(self, keyword, userid):
+        query = """
+        SELECT * FROM orders
+        WHERE (number LIKE ? OR comment LIKE ?) AND userid = ?
+        """
+        params = (f"%{keyword}%", f"%{keyword}%", userid)
+        await self.cursor.execute(query, params)
+        return await self.cursor.fetchall()
+    
     async def get_all_orders_userid(self, userid):
         await self.cursor.execute("SELECT * FROM orders where userid = ?",(userid,))
         return await self.cursor.fetchall()

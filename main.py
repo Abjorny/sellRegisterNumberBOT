@@ -5,7 +5,10 @@ from aiogram import Bot, Dispatcher
 from callbacks import peganator
 from handlers import bot_message
 import config
-from forms import formRegisterProfile, formAddNumber, FormAddAdministrator, FormEditNumber
+from forms import formRegisterProfile, formAddNumber, FormAddAdministrator,\
+    FormEditNumber, FormSetPrice, FormSetActualTime, FormFoundMyNumber, \
+    FormMassAddText, FormMassAddPhoto
+    
 from db import Database
 
 DataBase = Database("DB.db")
@@ -19,12 +22,17 @@ async def main():
     dp = Dispatcher()
     
     dp.include_routers(
-        bot_message.router,
         peganator.router,
         formRegisterProfile.router,
         formAddNumber.router,
         FormAddAdministrator.router,
-        FormEditNumber.router
+        FormEditNumber.router,
+        FormSetPrice.router,
+        FormSetActualTime.router,
+        FormFoundMyNumber.router,
+        FormMassAddText.router,
+        FormMassAddPhoto.router,
+        bot_message.router,
     )
     
     try:

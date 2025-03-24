@@ -1,9 +1,10 @@
 
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types.inline_keyboard_button import InlineKeyboardButton
 from config import  start_menu, admin_menu,\
                     verif_menu, profile_menu,\
-                    admin_menulist
+                    admin_menulist, massAddMenu
 
 
 
@@ -55,26 +56,40 @@ def pagination(page: int=0,id: int=1,last:str='',elem: list=None):
         build.adjust(1)
             
     elif page == 3:
-        for order in elem:
+        for order in elem[id * 10:(id * 10) + 10]:
             textButton =  f"{order[2]} | {order[4]} | {order[3]}"
-            if order[7] is None:
-                build.button(
-                    text = textButton,
-                    url = order[5]
-                )
-            else:
-                build.button(
+            build.button(
                     text = textButton,
                     callback_data=Pagination(action = "openOrder", page=page, last=last, data=f'{order[0]}')
                 )
-                
-                
-        build.button(
-            text = "⬅️ Назад",
-            callback_data=Pagination(action = last, page=page, last=last, data='')
-        )
-        build.adjust(1)
+        
+        if id == 0:
+            button_utilis_one = InlineKeyboardButton(
+                text = "⬅️ Назад",
+                callback_data= "menu"
+            )
+        else:
+            button_utilis_one = InlineKeyboardButton(
+                text = "⬅️",
+                callback_data= "back-page"
+            )
 
+
+        if last == "max":
+            button_utilis_three = InlineKeyboardButton(
+                text = "⠀",
+                callback_data = "invisible"
+            )
+        else:
+            button_utilis_three = InlineKeyboardButton(
+                text = "➡️",
+                callback_data = "next-page"
+            )
+        build.adjust(1)
+        build.row(
+            button_utilis_one, button_utilis_three
+        ) 
+        
     elif page == 4:
         for element in profile_menu:
             build.button(
@@ -187,6 +202,7 @@ def pagination(page: int=0,id: int=1,last:str='',elem: list=None):
             callback_data=Pagination(action = last, page=page, last=last, data='')
         )
         build.adjust(1)
+    
     elif page == 12:
         for payment in elem:
             build.button(
@@ -198,6 +214,7 @@ def pagination(page: int=0,id: int=1,last:str='',elem: list=None):
             callback_data=Pagination(action = last, page=page, last=last, data='')
         )
         build.adjust(2)
+    
     elif page == 13:
         build.button(
             text = "Оплатить!",
@@ -234,6 +251,7 @@ def pagination(page: int=0,id: int=1,last:str='',elem: list=None):
             callback_data=Pagination(action = "deleateMessage", page=page, last=last, data='')
         )
         build.adjust(1) 
+    
     elif page == 16:
         build.button(
             text = "Готово",
@@ -244,4 +262,56 @@ def pagination(page: int=0,id: int=1,last:str='',elem: list=None):
             callback_data=Pagination(action = last, page=page, last=last, data='')
         )
         build.adjust(1) 
+    
+    elif page == 17:
+        for order in elem[id * 10:(id * 10) + 10]:
+            textButton =  f"{order[2]} | {order[4]} | {order[3]}"
+            build.button(
+                    text = textButton,
+                    callback_data=Pagination(action = "getOrder", page=page, last=last, data=f'{order[0]}')
+                )
+        
+        if id == 0:
+            button_utilis_one = InlineKeyboardButton(
+                text = "⬅️ Назад",
+                callback_data= "profile"
+            )
+        else:
+            button_utilis_one = InlineKeyboardButton(
+                text = "⬅️",
+                callback_data= "back-page"
+            )
+
+
+        if last == "max":
+            button_utilis_three = InlineKeyboardButton(
+                text = "⠀",
+                callback_data = "invisible"
+            )
+        else:
+            button_utilis_three = InlineKeyboardButton(
+                text = "➡️",
+                callback_data = "next-page"
+            )
+        build.adjust(1)
+        build.row(
+            button_utilis_one, button_utilis_three
+        ) 
+    
+    
+    elif page == 18:
+
+        for element in massAddMenu:
+            build.button(
+                text = element['title'],
+                callback_data=Pagination(action = element['action'], page=page, last=last, data='')
+            )
+            
+        build.button(
+            text = "⬅️ Назад",
+            callback_data=Pagination(action = last, page=page, last=last, data='')
+        )
+        
+        build.adjust(1)
+
     return build.as_markup(resize_keyboard=True)

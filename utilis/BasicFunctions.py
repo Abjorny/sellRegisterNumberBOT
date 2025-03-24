@@ -21,7 +21,7 @@ class Order:
     
     @staticmethod
     async def add_object(data, photos_str, message: Message) -> int: 
-        url = Order.format_url(message)
+        url = await Order.format_url(message)
         ids = await dataBase.add_order(
             userid = message.chat.id,
             url =  url,
@@ -51,3 +51,33 @@ class Order:
     @staticmethod
     async def format_photos_str(photos: list) -> str:
         return ",".join(photos)  if photos is not None else None
+    
+    @staticmethod
+    async def get_all_orders():
+        orders = await dataBase.get_all_orders_active()
+        relevance_allowed = await dataBase.get_settings('relevance_allowed')
+        actual_time = await dataBase.get_settings('actual_time')
+        price = await dataBase.get_settings('price')
+        
+        orders_list = []
+        
+        for order in orders:
+            userData = await dataBase.get_user_userid(order[1])
+            if bool(relevance_allowed):
+                if userData[8]:
+                    stored_time = datetime.strptime(userData[8], "%Y-%m-%d %H:%M:%S")
+                    now = datetime.now()
+                    difference = (now - stored_time).days
+                    if difference <= actual_time -1:
+                        if price != None and price !=0:
+                            if userData[5]:
+                                stored_time = datetime.strptime(userData[5], "%Y-%m-%d %H:%M:%S")
+                                now = datetime.now()
+                                difference = (now - stored_time).days
+                                if difference < 30:
+                                    orders_list.append(order)
+                        else:
+                            orders_list.append(order)
+            else:
+                orders_list.append(order)
+        return orders_list
