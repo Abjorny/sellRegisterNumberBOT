@@ -167,6 +167,17 @@ async def pagination_handler(call: CallbackQuery,state: FSMContext,):
         peganatorMessage.text += "*"
     await peganatorMessage.callEditText()
 
+    
+@router.callback_query(F.data == "search")
+async def pagination_handler(call: CallbackQuery,state: FSMContext,):
+    peganatorMessage = PeganatorMessageSerializer(call = call,
+                                                  state = state)
+    await state.clear()
+    peganatorMessage.text = f"*Введите комбинацию букв или цифр, которую хотите видеть в номере.*"
+    peganatorMessage.page = 1
+    peganatorMessage.last = "ordersList"
+    
+    await peganatorMessage.callEditText()
 
 
 @router.callback_query(Pagination.filter())

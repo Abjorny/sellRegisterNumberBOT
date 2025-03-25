@@ -85,9 +85,16 @@ def pagination(page: int=0,id: int=1,last:str='',elem: list=None):
                 text = "➡️",
                 callback_data = "next-page"
             )
+            
+        button_utilis_four = InlineKeyboardButton(
+                text = "🔍",
+                callback_data = "search"
+        )      
+        
         build.adjust(1)
+        
         build.row(
-            button_utilis_one, button_utilis_three
+            button_utilis_one,button_utilis_four, button_utilis_three, 
         ) 
         
     elif page == 4:
