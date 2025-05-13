@@ -201,7 +201,7 @@ def pagination(page: int=0,id: int=1,last:str='',elem: list=None):
     elif page == 11:
         for user in elem:
             build.button(
-                text = f"{user[2]} | {user[1]}",
+                text = f"{user[3]} | {user[1]}",
                 callback_data=Pagination(action = "setUserRole", page=page, last='user', data=f'{user[1]}')
             )
         build.button(
